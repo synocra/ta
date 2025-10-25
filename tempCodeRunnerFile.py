@@ -5,7 +5,7 @@ model = YOLO("ultralytics/cfg/models/11/yolo11mod.yaml")
 
 # training
 model.train(
-    data="fruit.yaml",   # path dataset
+    data="fruit.yaml",  # path dataset
     epochs=100,
     imgsz=640,
 )

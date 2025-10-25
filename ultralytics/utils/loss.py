@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
 import math
+from typing import Any
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,19 +14,28 @@ from ultralytics.utils.ops import crop_mask, xywh2xyxy, xyxy2xywh
 from ultralytics.utils.tal import RotatedTaskAlignedAssigner, TaskAlignedAssigner, dist2bbox, dist2rbox, make_anchors
 from ultralytics.utils.torch_utils import autocast
 
-from .metrics import bbox_iou, probiou
+from .metrics import probiou
 from .tal import bbox2dist
+
 
 def wise_piou(pred_boxes, target_boxes, eps=1e-7):
     """
     Wise-PIOU: Improved IoU loss combining PIoU stability and weighted factor
-    Reference: https://arxiv.org/abs/2301.10051
+    Reference: https://arxiv.org/abs/2301.10051.
     """
     # xyxy to center form (x,y,w,h)
-    px, py, pw, ph = (pred_boxes[:, 0] + pred_boxes[:, 2]) / 2, (pred_boxes[:, 1] + pred_boxes[:, 3]) / 2, \
-                     pred_boxes[:, 2] - pred_boxes[:, 0], pred_boxes[:, 3] - pred_boxes[:, 1]
-    gx, gy, gw, gh = (target_boxes[:, 0] + target_boxes[:, 2]) / 2, (target_boxes[:, 1] + target_boxes[:, 3]) / 2, \
-                     target_boxes[:, 2] - target_boxes[:, 0], target_boxes[:, 3] - target_boxes[:, 1]
+    px, py, pw, ph = (
+        (pred_boxes[:, 0] + pred_boxes[:, 2]) / 2,
+        (pred_boxes[:, 1] + pred_boxes[:, 3]) / 2,
+        pred_boxes[:, 2] - pred_boxes[:, 0],
+        pred_boxes[:, 3] - pred_boxes[:, 1],
+    )
+    gx, gy, gw, gh = (
+        (target_boxes[:, 0] + target_boxes[:, 2]) / 2,
+        (target_boxes[:, 1] + target_boxes[:, 3]) / 2,
+        target_boxes[:, 2] - target_boxes[:, 0],
+        target_boxes[:, 3] - target_boxes[:, 1],
+    )
 
     # intersection
     x1 = torch.max(pred_boxes[:, 0], target_boxes[:, 0])
@@ -41,10 +51,10 @@ def wise_piou(pred_boxes, target_boxes, eps=1e-7):
     # center distance
     cx_dist = (px - gx) ** 2 + (py - gy) ** 2
     cw, ch = torch.max(pred_boxes[:, 2], target_boxes[:, 2]), torch.max(pred_boxes[:, 3], target_boxes[:, 3])
-    c_diag = cw ** 2 + ch ** 2 + eps
+    c_diag = cw**2 + ch**2 + eps
 
     # penalty term (stabilized)
-    v = (4 / (math.pi ** 2)) * torch.pow(torch.atan(gw / gh) - torch.atan(pw / ph), 2)
+    v = (4 / (math.pi**2)) * torch.pow(torch.atan(gw / gh) - torch.atan(pw / ph), 2)
     alpha = v / (1 - iou + v + eps)
 
     # wise weighting (reduces gradient explosion)
@@ -166,7 +176,6 @@ class BboxLoss(nn.Module):
         weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
         iou = wise_piou(pred_bboxes[fg_mask], target_bboxes[fg_mask])
         loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
-
 
         # DFL loss
         if self.dfl_loss:
