@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 
 # Load model hasil training kamu
-model = YOLO("D:/TATATA/halo/runs/yolo11mod_ripeness7/weights/last.pt")
+model = YOLO("D:/TATATA/halo/ultralytics/best.pt")
 
 # Jalankan kamera default (index 0)
 model.predict(

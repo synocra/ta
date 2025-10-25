@@ -4,7 +4,7 @@ from ultralytics import YOLO
 # ✅ Inisialisasi path utama
 ROOT_DIR = "/content/ta"
 DATA_PATH = os.path.join(ROOT_DIR, "dataset.yaml")
-MODEL_CFG = os.path.join(ROOT_DIR, "ultralytics", "cfg", "models", "11", "yolo11mod.yaml")
+MODEL_CFG = os.path.join(ROOT_DIR, "ultralytics", "cfg", "models", "11", "yolo11.yaml")
 RUNS_DIR = os.path.join(ROOT_DIR, "runs")
 
 # ✅ Validasi path dataset.yaml
@@ -33,9 +33,9 @@ model.train(
     warmup_epochs=3,
     amp=True,
     deterministic=False,
-    pretrained=True,  # ✅ pindahkan ke sini
+    pretrained=True,
     project=RUNS_DIR,
-    name="yolo11mod_ripeness_colab",
+    name="yolo11biasa_ripeness_colab",
     verbose=True
 )
 
