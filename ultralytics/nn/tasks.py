@@ -16,6 +16,7 @@ from ultralytics.nn.modules import (
     C1,
     C2,
     C2PSA,
+    CoordAtt,
     C3,
     C3TR,
     ELAN1,

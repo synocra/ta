@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,6 +15,43 @@ from ultralytics.utils.torch_utils import autocast
 
 from .metrics import bbox_iou, probiou
 from .tal import bbox2dist
+
+def wise_piou(pred_boxes, target_boxes, eps=1e-7):
+    """
+    Wise-PIOU: Improved IoU loss combining PIoU stability and weighted factor
+    Reference: https://arxiv.org/abs/2301.10051
+    """
+    # xyxy to center form (x,y,w,h)
+    px, py, pw, ph = (pred_boxes[:, 0] + pred_boxes[:, 2]) / 2, (pred_boxes[:, 1] + pred_boxes[:, 3]) / 2, \
+                     pred_boxes[:, 2] - pred_boxes[:, 0], pred_boxes[:, 3] - pred_boxes[:, 1]
+    gx, gy, gw, gh = (target_boxes[:, 0] + target_boxes[:, 2]) / 2, (target_boxes[:, 1] + target_boxes[:, 3]) / 2, \
+                     target_boxes[:, 2] - target_boxes[:, 0], target_boxes[:, 3] - target_boxes[:, 1]
+
+    # intersection
+    x1 = torch.max(pred_boxes[:, 0], target_boxes[:, 0])
+    y1 = torch.max(pred_boxes[:, 1], target_boxes[:, 1])
+    x2 = torch.min(pred_boxes[:, 2], target_boxes[:, 2])
+    y2 = torch.min(pred_boxes[:, 3], target_boxes[:, 3])
+    inter = torch.clamp(x2 - x1, min=0) * torch.clamp(y2 - y1, min=0)
+
+    # union
+    union = pw * ph + gw * gh - inter + eps
+    iou = inter / union
+
+    # center distance
+    cx_dist = (px - gx) ** 2 + (py - gy) ** 2
+    cw, ch = torch.max(pred_boxes[:, 2], target_boxes[:, 2]), torch.max(pred_boxes[:, 3], target_boxes[:, 3])
+    c_diag = cw ** 2 + ch ** 2 + eps
+
+    # penalty term (stabilized)
+    v = (4 / (math.pi ** 2)) * torch.pow(torch.atan(gw / gh) - torch.atan(pw / ph), 2)
+    alpha = v / (1 - iou + v + eps)
+
+    # wise weighting (reduces gradient explosion)
+    w = torch.exp(-torch.abs(iou - 0.5) * 4)  # adaptive weighting factor
+
+    wise_piou = iou - (cx_dist / c_diag + v * alpha) * w
+    return wise_piou.clamp(0.0)
 
 
 class VarifocalLoss(nn.Module):
@@ -127,8 +164,9 @@ class BboxLoss(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute IoU and DFL losses for bounding boxes."""
         weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
-        iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
+        iou = wise_piou(pred_bboxes[fg_mask], target_bboxes[fg_mask])
         loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
+
 
         # DFL loss
         if self.dfl_loss:
