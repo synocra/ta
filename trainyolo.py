@@ -1,5 +1,7 @@
-from ultralytics import YOLO
 import os
+
+from ultralytics import YOLO
+
 
 # checkpointing
 def save_checkpoint(trainer):
@@ -11,6 +13,7 @@ def save_checkpoint(trainer):
         ckpt_path = os.path.join(ckpt_dir, f"epoch_{epoch}.pt")
         trainer.model[0].save(ckpt_path)
         print(f"\n✅ Checkpoint disimpan: {ckpt_path}")
+
 
 if __name__ == "__main__":
     # model
@@ -25,9 +28,9 @@ if __name__ == "__main__":
         epochs=100,
         imgsz=480,
         batch=2,
-        workers=2,   # ubah ke 0 jika debugging di Windows
+        workers=2,  # ubah ke 0 jika debugging di Windows
         device=0,
         project="D:/TATATA/halo/runs",
         name="yolo11mod_ripeness",
-        save=True,   # tetap simpan best.pt & last.pt bawaan
+        save=True,  # tetap simpan best.pt & last.pt bawaan
     )
