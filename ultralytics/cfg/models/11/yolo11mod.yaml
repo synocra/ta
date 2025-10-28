@@ -82,6 +82,7 @@
 # PARAMETERS
 # ==================================================
 nc: 80  # number of classes, override by dataset.yaml
+scale: n  # model scale: n, s, m, l, x
 scales:
   n: [0.50, 0.25, 1024]
   s: [0.50, 0.50, 1024]
