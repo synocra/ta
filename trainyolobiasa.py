@@ -1,6 +1,6 @@
 from ultralytics import YOLO
 
-model = YOLO("yolo11m.pt")  # ✅ langsung panggil pretrained YOLO11m
+model = YOLO("yolo11n.pt")  # ✅ langsung panggil pretrained YOLO11m
 model.train(
     data="/content/ta/dataset.yaml",
     epochs=100,

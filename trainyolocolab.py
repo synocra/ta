@@ -4,7 +4,7 @@ from ultralytics import YOLO
 # ✅ Inisialisasi path utama
 ROOT_DIR = "/content/ta"
 DATA_PATH = os.path.join(ROOT_DIR, "dataset.yaml")
-MODEL_CFG = os.path.join(ROOT_DIR, "ultralytics", "cfg", "models", "11", "yolo11mod.yaml")
+MODEL_CFG = os.path.join(ROOT_DIR, "ultralytics", "cfg", "models", "11", "yolo11mod.yaml")  # custom nano
 RUNS_DIR = os.path.join(ROOT_DIR, "runs")
 
 # ✅ Validasi path dataset.yaml
@@ -16,8 +16,8 @@ print(" - Model :", MODEL_CFG)
 print(" - Data  :", DATA_PATH)
 print(" - Runs  :", RUNS_DIR)
 
-# ✅ Load model custom
-model = YOLO(MODEL_CFG)  # ❌ tanpa pretrained di sini
+# ✅ Load model YOLO11mod dengan skala nano
+model = YOLO(MODEL_CFG, scale='n')  # ✅ paksa pakai skala nano
 
 # ✅ Latih model di GPU T4
 model.train(
@@ -33,11 +33,11 @@ model.train(
     warmup_epochs=3,
     amp=True,
     deterministic=False,
-    pretrained=True,  # ✅ pindahkan ke sini
+    pretrained=True,  # gunakan backbone pretrained
     project=RUNS_DIR,
-    name="yolo11mod_ripeness_colab",
+    name="yolo11mod_nano_ripeness_colab",  # ✅ nama run disesuaikan
     verbose=True
 )
 
 print("\n🎉 Training selesai! Model tersimpan di folder:")
-print(f"📂 {os.path.join(RUNS_DIR, 'yolo11mod_ripeness_colab')}")
+print(f"📂 {os.path.join(RUNS_DIR, 'yolo11mod_nano_ripeness_colab')}")
