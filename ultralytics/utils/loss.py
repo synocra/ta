@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
 import math
+from typing import Any
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,19 +14,27 @@ from ultralytics.utils.ops import crop_mask, xywh2xyxy, xyxy2xywh
 from ultralytics.utils.tal import RotatedTaskAlignedAssigner, TaskAlignedAssigner, dist2bbox, dist2rbox, make_anchors
 from ultralytics.utils.torch_utils import autocast
 
-from .metrics import bbox_iou, probiou
+from .metrics import probiou
 from .tal import bbox2dist
 
+
 def wise_piou(pred_boxes, target_boxes, eps=1e-7):
-    """
-    Wise-PIOU: Improved IoU loss combining PIoU stability and weighted factor
-    Reference: https://arxiv.org/abs/2301.10051
+    """Wise-PIOU: Improved IoU loss combining PIoU stability and weighted factor Reference:
+    https://arxiv.org/abs/2301.10051.
     """
     # xyxy to center form (x,y,w,h)
-    px, py, pw, ph = (pred_boxes[:, 0] + pred_boxes[:, 2]) / 2, (pred_boxes[:, 1] + pred_boxes[:, 3]) / 2, \
-                     pred_boxes[:, 2] - pred_boxes[:, 0], pred_boxes[:, 3] - pred_boxes[:, 1]
-    gx, gy, gw, gh = (target_boxes[:, 0] + target_boxes[:, 2]) / 2, (target_boxes[:, 1] + target_boxes[:, 3]) / 2, \
-                     target_boxes[:, 2] - target_boxes[:, 0], target_boxes[:, 3] - target_boxes[:, 1]
+    px, py, pw, ph = (
+        (pred_boxes[:, 0] + pred_boxes[:, 2]) / 2,
+        (pred_boxes[:, 1] + pred_boxes[:, 3]) / 2,
+        pred_boxes[:, 2] - pred_boxes[:, 0],
+        pred_boxes[:, 3] - pred_boxes[:, 1],
+    )
+    gx, gy, gw, gh = (
+        (target_boxes[:, 0] + target_boxes[:, 2]) / 2,
+        (target_boxes[:, 1] + target_boxes[:, 3]) / 2,
+        target_boxes[:, 2] - target_boxes[:, 0],
+        target_boxes[:, 3] - target_boxes[:, 1],
+    )
 
     # intersection
     x1 = torch.max(pred_boxes[:, 0], target_boxes[:, 0])
@@ -41,10 +50,10 @@ def wise_piou(pred_boxes, target_boxes, eps=1e-7):
     # center distance
     cx_dist = (px - gx) ** 2 + (py - gy) ** 2
     cw, ch = torch.max(pred_boxes[:, 2], target_boxes[:, 2]), torch.max(pred_boxes[:, 3], target_boxes[:, 3])
-    c_diag = cw ** 2 + ch ** 2 + eps
+    c_diag = cw**2 + ch**2 + eps
 
     # penalty term (stabilized)
-    v = (4 / (math.pi ** 2)) * torch.pow(torch.atan(gw / gh) - torch.atan(pw / ph), 2)
+    v = (4 / (math.pi**2)) * torch.pow(torch.atan(gw / gh) - torch.atan(pw / ph), 2)
     alpha = v / (1 - iou + v + eps)
 
     # wise weighting (reduces gradient explosion)
@@ -55,8 +64,7 @@ def wise_piou(pred_boxes, target_boxes, eps=1e-7):
 
 
 class VarifocalLoss(nn.Module):
-    """
-    Varifocal loss by Zhang et al.
+    """Varifocal loss by Zhang et al.
 
     Implements the Varifocal Loss function for addressing class imbalance in object detection by focusing on
     hard-to-classify examples and balancing positive/negative samples.
@@ -88,11 +96,10 @@ class VarifocalLoss(nn.Module):
 
 
 class FocalLoss(nn.Module):
-    """
-    Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5).
+    """Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5).
 
-    Implements the Focal Loss function for addressing class imbalance by down-weighting easy examples and focusing
-    on hard negatives during training.
+    Implements the Focal Loss function for addressing class imbalance by down-weighting easy examples and focusing on
+    hard negatives during training.
 
     Attributes:
         gamma (float): The focusing parameter that controls how much the loss focuses on hard-to-classify examples.
@@ -166,7 +173,6 @@ class BboxLoss(nn.Module):
         weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
         iou = wise_piou(pred_bboxes[fg_mask], target_bboxes[fg_mask])
         loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
-
 
         # DFL loss
         if self.dfl_loss:
@@ -437,8 +443,7 @@ class v8SegmentationLoss(v8DetectionLoss):
     def single_mask_loss(
         gt_mask: torch.Tensor, pred: torch.Tensor, proto: torch.Tensor, xyxy: torch.Tensor, area: torch.Tensor
     ) -> torch.Tensor:
-        """
-        Compute the instance segmentation loss for a single image.
+        """Compute the instance segmentation loss for a single image.
 
         Args:
             gt_mask (torch.Tensor): Ground truth mask of shape (N, H, W), where N is the number of objects.
@@ -470,8 +475,7 @@ class v8SegmentationLoss(v8DetectionLoss):
         imgsz: torch.Tensor,
         overlap: bool,
     ) -> torch.Tensor:
-        """
-        Calculate the loss for instance segmentation.
+        """Calculate the loss for instance segmentation.
 
         Args:
             fg_mask (torch.Tensor): A binary tensor of shape (BS, N_anchors) indicating which anchors are positive.
@@ -623,8 +627,7 @@ class v8PoseLoss(v8DetectionLoss):
         target_bboxes: torch.Tensor,
         pred_kpts: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Calculate the keypoints loss for the model.
+        """Calculate the keypoints loss for the model.
 
         This function calculates the keypoints loss and keypoints object loss for a given batch. The keypoints loss is
         based on the difference between the predicted keypoints and ground truth keypoints. The keypoints object loss is
@@ -798,8 +801,7 @@ class v8OBBLoss(v8DetectionLoss):
     def bbox_decode(
         self, anchor_points: torch.Tensor, pred_dist: torch.Tensor, pred_angle: torch.Tensor
     ) -> torch.Tensor:
-        """
-        Decode predicted object bounding box coordinates from anchor points and distribution.
+        """Decode predicted object bounding box coordinates from anchor points and distribution.
 
         Args:
             anchor_points (torch.Tensor): Anchor points, (h*w, 2).

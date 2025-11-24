@@ -4,7 +4,7 @@
 import torch
 import torch.nn as nn
 
-__all__ = ['CoordAtt']
+__all__ = ["CoordAtt"]
 
 
 class h_sigmoid(nn.Module):
@@ -26,9 +26,8 @@ class h_swish(nn.Module):
 
 
 class CoordAtt(nn.Module):
-    """
-    Coordinate Attention Module (fixed dynamic version)
-    Paper: Coordinate Attention for Efficient Mobile Network Design
+    """Coordinate Attention Module (fixed dynamic version) Paper: Coordinate Attention for Efficient Mobile Network
+    Design.
     """
 
     def __init__(self, inp, oup, reduction=32):
@@ -48,9 +47,9 @@ class CoordAtt(nn.Module):
 
     def forward(self, x):
         identity = x
-        n, c, h, w = x.size()
+        _n, _c, h, w = x.size()
 
-        # pooling arah horizontal dan vertikal
+        # pooling arah horizontal dan vertical
         x_h = self.pool_h(x)
         x_w = self.pool_w(x).permute(0, 1, 3, 2)
 

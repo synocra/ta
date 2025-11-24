@@ -1,9 +1,9 @@
 # YOLOv11 Dataset Configuration (for Colab)
-path: /content/ta/dataset  # root folder dataset di Colab
+path: /content/ta/dataset # root folder dataset di Colab
 
 train: train/images
 val: valid/images
-test: test/images  # opsional, bisa dihapus jika tidak ada
+test: test/images # opsional, bisa dihapus jika tidak ada
 
 # Jumlah kelas
 nc: 6

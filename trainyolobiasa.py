@@ -11,5 +11,5 @@ model.train(
     lr0=0.001,
     pretrained=True,
     project="/content/ta/runs",
-    name="yolo11m_ripeness_colab"
+    name="yolo11m_ripeness_colab",
 )

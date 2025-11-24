@@ -1,4 +1,5 @@
 import os
+
 from ultralytics import YOLO
 
 # ✅ Inisialisasi path utama
@@ -17,7 +18,7 @@ print(" - Data  :", DATA_PATH)
 print(" - Runs  :", RUNS_DIR)
 
 # ✅ Load model YOLO11mod dengan skala nano
-model = YOLO(MODEL_CFG, scale='n')  # ✅ paksa pakai skala nano
+model = YOLO(MODEL_CFG, scale="n")  # ✅ paksa pakai skala nano
 
 # ✅ Latih model di GPU T4
 model.train(
@@ -36,7 +37,7 @@ model.train(
     pretrained=True,  # gunakan backbone pretrained
     project=RUNS_DIR,
     name="yolo11mod_nano_ripeness_colab",  # ✅ nama run disesuaikan
-    verbose=True
+    verbose=True,
 )
 
 print("\n🎉 Training selesai! Model tersimpan di folder:")
