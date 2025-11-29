@@ -7,16 +7,15 @@ model = YOLO("yolo11s.pt")
 model.train(
     data="dataset.yaml",  # pastikan path YAML benar
     epochs=100,
-    imgsz=480,
+    imgsz=360,
     batch=8,
     device=0,
     optimizer="AdamW",
     lr0=0.001,
-    pretrained=True,  # tetap gunakan backbone pretrained
+    pretrained=False,  # tetap gunakan backbone pretrained
     project="runs",
     name="yolo11s_ripeness_farview",
     
-    # ⚙️ Augmentasi untuk mensimulasikan objek kecil (jarak jauh)
     scale=0.40,           # mengecilkan objek (0.3–0.6 ideal)
     translate=0.20,       # geser posisi objek, menambah variasi posisi
     mosaic=1.0,           # aktifkan mosaic untuk memperkecil buah relatif

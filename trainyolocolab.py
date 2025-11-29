@@ -24,6 +24,7 @@ model.train(
     epochs=100,
     imgsz=360,
     batch=8,
+    workers=2,
     device=0,
     optimizer="AdamW",
     lr0=0.001,
