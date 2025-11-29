@@ -16,27 +16,20 @@ print(" - Model :", MODEL_CFG)
 print(" - Data  :", DATA_PATH)
 print(" - Runs  :", RUNS_DIR)
 
-# ✅ Load model YOLO11mod (nano variant)
 model = YOLO(MODEL_CFG)
 
 # ✅ Latih model di GPU T4 dengan augmentasi “jarak jauh”
 model.train(
     data=DATA_PATH,
     epochs=100,
-    imgsz=480,
+    imgsz=360,
     batch=8,
-    workers=2,
     device=0,
     optimizer="AdamW",
     lr0=0.001,
-    momentum=0.9,
-    warmup_epochs=3,
-    amp=True,
-    deterministic=False,
-    pretrained=True,
+    pretrained=False,
     project=RUNS_DIR,
     name="yolo11mod_nano_ripeness_farview",
-    verbose=True,
 
     # 💡 Augmentasi untuk simulasi objek kecil
     scale=0.40,          # mengecilkan objek (0.4–0.6 cocok)

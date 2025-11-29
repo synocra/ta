@@ -1,11 +1,11 @@
 from ultralytics import YOLO
 
 # ✅ Load pretrained YOLO11n
-model = YOLO("yolo11n.pt")
+model = YOLO("yolo11s.pt")
 
 # ✅ Latih model dengan augmentasi "buah tampak kecil / jauh"
 model.train(
-    data="D:/TATATA/halo/dataset.yaml",  # pastikan path YAML benar
+    data="dataset.yaml",  # pastikan path YAML benar
     epochs=100,
     imgsz=480,
     batch=8,
@@ -13,8 +13,8 @@ model.train(
     optimizer="AdamW",
     lr0=0.001,
     pretrained=True,  # tetap gunakan backbone pretrained
-    project="D:/TATATA/halo/runs",
-    name="yolo11n_ripeness_farview",
+    project="runs",
+    name="yolo11s_ripeness_farview",
     
     # ⚙️ Augmentasi untuk mensimulasikan objek kecil (jarak jauh)
     scale=0.40,           # mengecilkan objek (0.3–0.6 ideal)
