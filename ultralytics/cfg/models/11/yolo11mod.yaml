@@ -6,9 +6,6 @@ scales:
   l: [1.00, 1.00, 512]
   x: [1.00, 1.50, 512]
 
-# ==================================================
-# BACKBONE (C3k2 + CA selective)
-# ==================================================
 backbone:
   - [-1, 1, Conv, [64, 3, 2]]           # 0-P1/2
   - [-1, 1, Conv, [128, 3, 2]]          # 1-P2/4
@@ -24,9 +21,6 @@ backbone:
   - [-1, 1, C3k2, [1024, False, 0.25]]  # 11 final bottleneck
   # Outputs: P2(3), P3(5), P4(7), P5(11)
 
-# ==================================================
-# NECK + HEAD (FPN + PAN + P2 Head)
-# ==================================================
 head:
   # 🔹 FPN Top-down Path: P5 → P4 → P3
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 12 Upsample P5
@@ -37,13 +31,11 @@ head:
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 16 Upsample P4
   - [[-1, 5], 1, Concat, [1]]                   # 17 cat P3
   - [-1, 1, C3k2, [256, False, 0.25]]           # 18
-  - [-1, 1, CoordAtt, [256, 256]]               # 19 ✅ optional mid-level CA (kept lightweight)
 
   # 🔹 High-Resolution P2 Head
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 20 Upsample P3 → P2
   - [[-1, 1], 1, Concat, [1]]                   # 21 cat P2 backbone
   - [-1, 1, C3k2, [128, False, 0.25]]           # 22 tiny head
-  - [-1, 1, CoordAtt, [128, 128]]               # 23 ✅ CA only on P2 head
 
   # 🔹 PAN Bottom-up Path
   - [-1, 1, Conv, [256, 3, 2]]                  # 24 Downsample P2→P3
