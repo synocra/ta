@@ -30,6 +30,7 @@ model.train(
     pretrained=False,
     project=RUNS_DIR,
     name="yolo11mod_nano_ripeness_farview",
+    verbose=True,
 
     # 💡 Augmentasi untuk simulasi objek kecil
     scale=0.40,          # mengecilkan objek (0.4–0.6 cocok)
