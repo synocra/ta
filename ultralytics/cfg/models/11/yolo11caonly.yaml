@@ -1,4 +1,4 @@
-nc: 80
+nc: 80  # number of classes, override by dataset.yaml
 scales:
   n: [0.50, 0.25, 1024]
   s: [0.50, 0.50, 1024]
@@ -10,7 +10,7 @@ backbone:
   - [-1, 1, Conv, [64, 3, 2]]           # 0-P1/2
   - [-1, 1, Conv, [128, 3, 2]]          # 1-P2/4
   - [-1, 1, C3k2, [256, False, 0.25]]   # 2
-  - [-1, 1, CoordAtt, [256, 256]]       # 3  <-- CA BACKBONE (tetap)
+  - [-1, 1, CoordAtt, [256, 256]]       # 3 ✅ CA at P3 backbone (KEPT)
   - [-1, 1, Conv, [256, 3, 2]]          # 4-P3/8
   - [-1, 1, C3k2, [512, False, 0.25]]   # 5
   - [-1, 1, Conv, [512, 3, 2]]          # 6-P4/16
@@ -18,36 +18,29 @@ backbone:
   - [-1, 1, Conv, [1024, 3, 2]]         # 8-P5/32
   - [-1, 1, C3k2, [1024, False, 0.25]]  # 9
   - [-1, 1, SPPF, [1024, 5]]            # 10
-  - [-1, 1, C3k2, [1024, False, 0.25]]  # 11 (P5-final)
+  - [-1, 1, C3k2, [1024, False, 0.25]]  # 11 → P5 final
+  # Backbone outputs used: P3(5), P4(7), P5(11)
+  # Note: P2 (index 1) and P3-CA (index 3) exist but P2 is NOT used in head
 
 head:
-  # ================================
-  # FPN: P5 → P4
-  # ================================
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]     # 12
-  - [[-1, 7], 1, Concat, [1]]                      # 13 (P4)
-  - [-1, 1, C3k2, [512, False, 0.25]]              # 14
-  - [-1, 1, CoordAtt, [512, 512]]                  # 15  <-- CA NECK (tetap)
+  # 🔹 FPN Top-down: P5 → P4 → P3
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]    # 12
+  - [[-1, 7], 1, Concat, [1]]                     # 13 (P4 from backbone index 7)
+  - [-1, 1, C3k2, [512, False, 0.25]]             # 14
+  - [-1, 1, CoordAtt, [512, 512]]                 # 15 ✅ CA in neck (KEPT)
 
-  # ================================
-  # FPN: P4 → P3
-  # ================================
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]     # 16
-  - [[-1, 5], 1, Concat, [1]]                      # 17 (P3)
-  - [-1, 1, C3k2, [256, False, 0.25]]              # 18 (P3-FPN out)
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]    # 16
+  - [[-1, 5], 1, Concat, [1]]                     # 17 (P3 from backbone index 5)
+  - [-1, 1, C3k2, [256, False, 0.25]]             # 18 → Final P3 for detection
 
-  # ====================================================
-  # PAN: bottom-up path (P3→P4→P5) — P2 sudah DIHAPUS
-  # ====================================================
-  - [-1, 1, Conv, [512, 3, 2]]                     # 19 Downsample P3→P4
-  - [[-1, 14], 1, Concat, [1]]                     # 20 cat P4 top-down
-  - [-1, 1, C3k2, [512, False, 0.25]]              # 21 (P4-PAN out)
+  # 🔹 PAN Bottom-up: P3 → P4 → P5  (START FROM P3, NOT P2!)
+  - [-1, 1, Conv, [512, 3, 2]]                    # 19 Downsample P3 → P4
+  - [[-1, 15], 1, Concat, [1]]                    # 20 cat with CA-enhanced P4 (index 15)
+  - [-1, 1, C3k2, [512, False, 0.25]]             # 21 → Final P4
 
-  - [-1, 1, Conv, [1024, 3, 2]]                    # 22 Downsample P4→P5
-  - [[-1, 11], 1, Concat, [1]]                     # 23 cat P5 backbone
-  - [-1, 1, C3k2, [1024, False, 0.25]]             # 24 (P5-PAN out)
+  - [-1, 1, Conv, [1024, 3, 2]]                   # 22 Downsample P4 → P5
+  - [[-1, 11], 1, Concat, [1]]                    # 23 cat with backbone P5 (index 11)
+  - [-1, 1, C3k2, [1024, False, 0.25]]            # 24 → Final P5
 
-  # ================================
-  # Detect (3 outputs: P3, P4, P5)
-  # ================================
-  - [[18, 21, 24], 1, Detect, [nc]]                # 25
+  # 🔹 Detection Head: ONLY P3, P4, P5 (NO P2)
+  - [[18, 21, 24], 1, Detect, [nc]]               # 25 ← P3(18), P4(21), P5(24)
