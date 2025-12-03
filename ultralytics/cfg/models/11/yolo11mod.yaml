@@ -31,19 +31,16 @@ head:
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]    # 16 Upsample P4
   - [[-1, 5], 1, Concat, [1]]                     # 17 cat P3
   - [-1, 1, C3k2, [256, False, 0.25]]             # 18
-  # BARIS 19 (CoordAtt [256, 256]) DIHAPUS
 
   # 🔹 High-Resolution P2 Head
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]    # 19 (sebelumnya 20) Upsample P3 → P2
   - [[-1, 1], 1, Concat, [1]]                     # 20 (sebelumnya 21) cat P2 backbone
   - [-1, 1, C3k2, [128, False, 0.25]]             # 21 (sebelumnya 22) tiny head
-  # BARIS 23 (CoordAtt [128, 128]) DIHAPUS
 
   # 🔹 PAN Bottom-up Path
   - [-1, 1, Conv, [256, 3, 2]]                    # 22 (sebelumnya 24) Downsample P2→P3
   - [[-1, 18], 1, Concat, [1]]                    # 23 (sebelumnya 25) cat P3 (Index '18' C3k2 P3 Top-down tetap)
   - [-1, 1, C3k2, [256, False, 0.25]]             # 24 (sebelumnya 26)
-  # ⚠️ CA di P3/P4 bawah dihapus agar inference cepat
 
   - [-1, 1, Conv, [512, 3, 2]]                    # 25 (sebelumnya 27) Downsample P3→P4
   - [[-1, 14], 1, Concat, [1]]                    # 26 (sebelumnya 28) cat P4 (Index '14' C3k2 P4 Top-down tetap)
