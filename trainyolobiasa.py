@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 
 # ✅ Load pretrained YOLO11n
-model = YOLO("yolo11s.pt")
+model = YOLO("yolo11n.pt")
 
 # ✅ Latih model dengan augmentasi "buah tampak kecil / jauh"
 model.train(
