@@ -4,7 +4,7 @@ from ultralytics import YOLO
 # ✅ Inisialisasi path utama
 ROOT_DIR = "/content/ta"
 DATA_PATH = os.path.join(ROOT_DIR, "dataset.yaml")
-MODEL_CFG = os.path.join(ROOT_DIR, "ultralytics", "cfg", "models", "11", "yolo11mod_n.yaml")
+MODEL_CFG = os.path.join(ROOT_DIR, "ultralytics", "cfg", "models", "11", "yolo11mod.yaml")
 RUNS_DIR = os.path.join(ROOT_DIR, "runs")
 
 # ✅ Validasi path dataset.yaml
