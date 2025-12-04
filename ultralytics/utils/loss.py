@@ -149,7 +149,7 @@ class BboxLoss(nn.Module):
     def __init__(self, reg_max: int = 16):
         super().__init__()
         self.dfl_loss = DFLoss(reg_max) if reg_max > 1 else None
-        self.wiou_loss = WIoULoss()
+        self.wiou_loss = WIoULoss(alpha=1.9, delta=3.0, momentum=0.05)
     def forward(
         self,
         pred_dist: torch.Tensor,
