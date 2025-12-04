@@ -10,7 +10,7 @@ model.train(
     imgsz=360,
     batch=8,
     device=0,
-    optimizer="SGD",
+    optimizer="AdamW",
     lr0=0.001,
     pretrained=False,
     project="runs",

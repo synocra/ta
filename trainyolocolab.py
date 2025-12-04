@@ -26,7 +26,7 @@ model.train(
     batch=8,
     workers=2,
     device=0,
-    optimizer="SGD",
+    optimizer="AdamW",
     lr0=0.001,
     pretrained=False,
     project=RUNS_DIR,
@@ -40,7 +40,6 @@ model.train(
     perspective=0.0005,  # distorsi ringan agar seperti jarak optik
     shear=1.0,           # sedikit rotasi & kemiringan
     hsv_h=0.015,
-    hsv_s=0.6,
     hsv_v=0.4,
     erasing=0.0,         # matikan random erasing agar objek kecil tidak hilang
     copy_paste=0.0,      # hindari salin-tempel berlebihan
