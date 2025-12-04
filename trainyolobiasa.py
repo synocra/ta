@@ -5,7 +5,7 @@ model = YOLO("yolo11n.pt")
 
 # ✅ Latih model dengan augmentasi "buah tampak kecil / jauh"
 model.train(
-    data="dataset.yaml",  # pastikan path YAML benar
+    data="dataset.yaml",
     epochs=100,
     imgsz=360,
     batch=8,
@@ -22,7 +22,6 @@ model.train(
     perspective=0.0005,   # efek distorsi kamera ringan
     shear=1.0,            # sedikit kemiringan untuk variasi perspektif
     hsv_h=0.015,          # variasi hue kecil
-    hsv_s=0.6,            # variasi saturasi (simulasi perubahan cahaya)
     hsv_v=0.4,            # variasi brightness
     erasing=0.0,          # nonaktifkan agar buah kecil tidak terhapus
     copy_paste=0.0,       # nonaktif agar tidak tempel objek berlebihan
