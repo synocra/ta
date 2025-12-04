@@ -10,9 +10,9 @@ model.train(
     imgsz=360,
     batch=8,
     device=0,
-    optimizer="AdamW",
+    optimizer="SGD",
     lr0=0.001,
-    pretrained=False,  # tetap gunakan backbone pretrained
+    pretrained=False,
     project="runs",
     name="yolo11s_ripeness_farview",
     

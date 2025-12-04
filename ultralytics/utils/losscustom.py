@@ -16,43 +16,42 @@ from ultralytics.utils.torch_utils import autocast
 from .metrics import bbox_iou, probiou
 from .tal import bbox2dist
 
-def wise_piou(pred_boxes, target_boxes, eps=1e-7):
-    """
-    Wise-PIOU: Improved IoU loss combining PIoU stability and weighted factor
-    Reference: https://arxiv.org/abs/2301.10051
-    """
-    # xyxy to center form (x,y,w,h)
-    px, py, pw, ph = (pred_boxes[:, 0] + pred_boxes[:, 2]) / 2, (pred_boxes[:, 1] + pred_boxes[:, 3]) / 2, \
-                     pred_boxes[:, 2] - pred_boxes[:, 0], pred_boxes[:, 3] - pred_boxes[:, 1]
-    gx, gy, gw, gh = (target_boxes[:, 0] + target_boxes[:, 2]) / 2, (target_boxes[:, 1] + target_boxes[:, 3]) / 2, \
-                     target_boxes[:, 2] - target_boxes[:, 0], target_boxes[:, 3] - target_boxes[:, 1]
+class WIoULoss(nn.Module):
+    def __init__(self, alpha=1.9, delta=3.0, momentum=0.05):
+        super().__init__()
+        self.alpha = alpha
+        self.delta = delta
+        self.riou_ema = None  # Exponential moving average of R_IoU
+        self.momentum = momentum
 
-    # intersection
-    x1 = torch.max(pred_boxes[:, 0], target_boxes[:, 0])
-    y1 = torch.max(pred_boxes[:, 1], target_boxes[:, 1])
-    x2 = torch.min(pred_boxes[:, 2], target_boxes[:, 2])
-    y2 = torch.min(pred_boxes[:, 3], target_boxes[:, 3])
-    inter = torch.clamp(x2 - x1, min=0) * torch.clamp(y2 - y1, min=0)
+    def forward(self, pred_boxes, target_boxes, eps=1e-7):
+        # Hitung IoU
+        x1 = torch.max(pred_boxes[:, 0], target_boxes[:, 0])
+        y1 = torch.max(pred_boxes[:, 1], target_boxes[:, 1])
+        x2 = torch.min(pred_boxes[:, 2], target_boxes[:, 2])
+        y2 = torch.min(pred_boxes[:, 3], target_boxes[:, 3])
+        inter = (x2 - x1).clamp(min=0) * (y2 - y1).clamp(min=0)
 
-    # union
-    union = pw * ph + gw * gh - inter + eps
-    iou = inter / union
+        area_pred = (pred_boxes[:, 2] - pred_boxes[:, 0]) * (pred_boxes[:, 3] - pred_boxes[:, 1])
+        area_target = (target_boxes[:, 2] - target_boxes[:, 0]) * (target_boxes[:, 3] - target_boxes[:, 1])
+        union = area_pred + area_target - inter + eps
+        iou = inter / union
 
-    # center distance
-    cx_dist = (px - gx) ** 2 + (py - gy) ** 2
-    cw, ch = torch.max(pred_boxes[:, 2], target_boxes[:, 2]), torch.max(pred_boxes[:, 3], target_boxes[:, 3])
-    c_diag = cw ** 2 + ch ** 2 + eps
+        riou = 1.0 - iou  # R_IoU
 
-    # penalty term (stabilized)
-    v = (4 / (math.pi ** 2)) * torch.pow(torch.atan(gw / gh) - torch.atan(pw / ph), 2)
-    alpha = v / (1 - iou + v + eps)
+        # Update EMA dari R_IoU (outlier degree denominator)
+        with torch.no_grad():
+            if self.riou_ema is None:
+                self.riou_ema = riou.mean().detach()
+            else:
+                self.riou_ema = self.momentum * riou.mean() + (1 - self.momentum) * self.riou_ema
 
-    # wise weighting (reduces gradient explosion)
-    w = torch.exp(-torch.abs(iou - 0.5) * 4)  # adaptive weighting factor
+            beta = riou / (self.riou_ema + eps)  # outlier degree
+            # Gradient gain: r = beta^delta * alpha^(beta - delta)
+            r = torch.pow(beta, self.delta) * torch.pow(self.alpha, beta - self.delta)
 
-    wise_piou = iou - (cx_dist / c_diag + v * alpha) * w
-    return wise_piou.clamp(0.0)
-
+        loss = (r * riou).mean()
+        return loss
 
 class VarifocalLoss(nn.Module):
     """
@@ -148,7 +147,6 @@ class BboxLoss(nn.Module):
     """Criterion class for computing training losses for bounding boxes."""
 
     def __init__(self, reg_max: int = 16):
-        """Initialize the BboxLoss module with regularization maximum and DFL settings."""
         super().__init__()
         self.dfl_loss = DFLoss(reg_max) if reg_max > 1 else None
 
@@ -162,16 +160,23 @@ class BboxLoss(nn.Module):
         target_scores_sum: torch.Tensor,
         fg_mask: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute IoU and DFL losses for bounding boxes."""
-        weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
-        iou = wise_piou(pred_bboxes[fg_mask], target_bboxes[fg_mask])
-        loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
+        """Compute WIoU v3 and DFL losses for bounding boxes."""
+        weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)  # [N_fg, 1]
 
+        # Hitung WIoU v3 loss
+        loss_iou = self.wiou_loss(
+            pred_bboxes[fg_mask],
+            target_bboxes[fg_mask],
+            weight=weight
+        ) / target_scores_sum
 
         # DFL loss
         if self.dfl_loss:
             target_ltrb = bbox2dist(anchor_points, target_bboxes, self.dfl_loss.reg_max - 1)
-            loss_dfl = self.dfl_loss(pred_dist[fg_mask].view(-1, self.dfl_loss.reg_max), target_ltrb[fg_mask]) * weight
+            loss_dfl = self.dfl_loss(
+                pred_dist[fg_mask].view(-1, self.dfl_loss.reg_max),
+                target_ltrb[fg_mask]
+            ) * weight
             loss_dfl = loss_dfl.sum() / target_scores_sum
         else:
             loss_dfl = torch.tensor(0.0).to(pred_dist.device)
