@@ -21,10 +21,11 @@ class WIoULoss(nn.Module):
         super().__init__()
         self.alpha = alpha
         self.delta = delta
-        self.riou_ema = None  # Exponential moving average of R_IoU
+        self.register_buffer("riou_ema", torch.tensor(0.0))  # gunakan buffer agar tersimpan di state_dict
         self.momentum = momentum
+        self.initialized = False
 
-    def forward(self, pred_boxes, target_boxes, eps=1e-7):
+    def forward(self, pred_boxes, target_boxes, weight=None, eps=1e-7):
         # Hitung IoU
         x1 = torch.max(pred_boxes[:, 0], target_boxes[:, 0])
         y1 = torch.max(pred_boxes[:, 1], target_boxes[:, 1])
@@ -36,21 +37,26 @@ class WIoULoss(nn.Module):
         area_target = (target_boxes[:, 2] - target_boxes[:, 0]) * (target_boxes[:, 3] - target_boxes[:, 1])
         union = area_pred + area_target - inter + eps
         iou = inter / union
-
         riou = 1.0 - iou  # R_IoU
 
         # Update EMA dari R_IoU (outlier degree denominator)
         with torch.no_grad():
-            if self.riou_ema is None:
-                self.riou_ema = riou.mean().detach()
+            riou_mean = riou.mean()
+            if not self.initialized:
+                self.riou_ema.copy_(riou_mean)
+                self.initialized = True
             else:
-                self.riou_ema = self.momentum * riou.mean() + (1 - self.momentum) * self.riou_ema
+                self.riou_ema.mul_(1 - self.momentum).add_(riou_mean * self.momentum)
 
             beta = riou / (self.riou_ema + eps)  # outlier degree
-            # Gradient gain: r = beta^delta * alpha^(beta - delta)
             r = torch.pow(beta, self.delta) * torch.pow(self.alpha, beta - self.delta)
 
-        loss = (r * riou).mean()
+        # Terapkan weight jika diberikan (kompatibel dengan YOLO11)
+        if weight is not None:
+            loss = (r * riou * weight).sum()
+        else:
+            loss = (r * riou).sum()
+
         return loss
 
 class VarifocalLoss(nn.Module):
@@ -150,6 +156,7 @@ class BboxLoss(nn.Module):
         super().__init__()
         self.dfl_loss = DFLoss(reg_max) if reg_max > 1 else None
         self.wiou_loss = WIoULoss(alpha=1.9, delta=3.0, momentum=0.05)
+
     def forward(
         self,
         pred_dist: torch.Tensor,
