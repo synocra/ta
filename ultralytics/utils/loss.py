@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,9 +16,46 @@ from ultralytics.utils.torch_utils import autocast
 from .metrics import bbox_iou, probiou
 from .tal import bbox2dist
 
+class WIoULoss(nn.Module):
+    def __init__(self, alpha=1.9, delta=3.0, momentum=0.05):
+        super().__init__()
+        self.alpha = alpha
+        self.delta = delta
+        self.riou_ema = None  # Exponential moving average of R_IoU
+        self.momentum = momentum
+
+    def forward(self, pred_boxes, target_boxes, eps=1e-7):
+        # Hitung IoU
+        x1 = torch.max(pred_boxes[:, 0], target_boxes[:, 0])
+        y1 = torch.max(pred_boxes[:, 1], target_boxes[:, 1])
+        x2 = torch.min(pred_boxes[:, 2], target_boxes[:, 2])
+        y2 = torch.min(pred_boxes[:, 3], target_boxes[:, 3])
+        inter = (x2 - x1).clamp(min=0) * (y2 - y1).clamp(min=0)
+
+        area_pred = (pred_boxes[:, 2] - pred_boxes[:, 0]) * (pred_boxes[:, 3] - pred_boxes[:, 1])
+        area_target = (target_boxes[:, 2] - target_boxes[:, 0]) * (target_boxes[:, 3] - target_boxes[:, 1])
+        union = area_pred + area_target - inter + eps
+        iou = inter / union
+
+        riou = 1.0 - iou  # R_IoU
+
+        # Update EMA dari R_IoU (outlier degree denominator)
+        with torch.no_grad():
+            if self.riou_ema is None:
+                self.riou_ema = riou.mean().detach()
+            else:
+                self.riou_ema = self.momentum * riou.mean() + (1 - self.momentum) * self.riou_ema
+
+            beta = riou / (self.riou_ema + eps)  # outlier degree
+            # Gradient gain: r = beta^delta * alpha^(beta - delta)
+            r = torch.pow(beta, self.delta) * torch.pow(self.alpha, beta - self.delta)
+
+        loss = (r * riou).mean()
+        return loss
 
 class VarifocalLoss(nn.Module):
-    """Varifocal loss by Zhang et al.
+    """
+    Varifocal loss by Zhang et al.
 
     Implements the Varifocal Loss function for addressing class imbalance in object detection by focusing on
     hard-to-classify examples and balancing positive/negative samples.
@@ -50,10 +87,11 @@ class VarifocalLoss(nn.Module):
 
 
 class FocalLoss(nn.Module):
-    """Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5).
+    """
+    Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5).
 
-    Implements the Focal Loss function for addressing class imbalance by down-weighting easy examples and focusing on
-    hard negatives during training.
+    Implements the Focal Loss function for addressing class imbalance by down-weighting easy examples and focusing
+    on hard negatives during training.
 
     Attributes:
         gamma (float): The focusing parameter that controls how much the loss focuses on hard-to-classify examples.
@@ -109,7 +147,6 @@ class BboxLoss(nn.Module):
     """Criterion class for computing training losses for bounding boxes."""
 
     def __init__(self, reg_max: int = 16):
-        """Initialize the BboxLoss module with regularization maximum and DFL settings."""
         super().__init__()
         self.dfl_loss = DFLoss(reg_max) if reg_max > 1 else None
 
@@ -123,15 +160,23 @@ class BboxLoss(nn.Module):
         target_scores_sum: torch.Tensor,
         fg_mask: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute IoU and DFL losses for bounding boxes."""
-        weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
-        iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
-        loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
+        """Compute WIoU v3 and DFL losses for bounding boxes."""
+        weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)  # [N_fg, 1]
+
+        # Hitung WIoU v3 loss
+        loss_iou = self.wiou_loss(
+            pred_bboxes[fg_mask],
+            target_bboxes[fg_mask],
+            weight=weight
+        ) / target_scores_sum
 
         # DFL loss
         if self.dfl_loss:
             target_ltrb = bbox2dist(anchor_points, target_bboxes, self.dfl_loss.reg_max - 1)
-            loss_dfl = self.dfl_loss(pred_dist[fg_mask].view(-1, self.dfl_loss.reg_max), target_ltrb[fg_mask]) * weight
+            loss_dfl = self.dfl_loss(
+                pred_dist[fg_mask].view(-1, self.dfl_loss.reg_max),
+                target_ltrb[fg_mask]
+            ) * weight
             loss_dfl = loss_dfl.sum() / target_scores_sum
         else:
             loss_dfl = torch.tensor(0.0).to(pred_dist.device)
@@ -397,7 +442,8 @@ class v8SegmentationLoss(v8DetectionLoss):
     def single_mask_loss(
         gt_mask: torch.Tensor, pred: torch.Tensor, proto: torch.Tensor, xyxy: torch.Tensor, area: torch.Tensor
     ) -> torch.Tensor:
-        """Compute the instance segmentation loss for a single image.
+        """
+        Compute the instance segmentation loss for a single image.
 
         Args:
             gt_mask (torch.Tensor): Ground truth mask of shape (N, H, W), where N is the number of objects.
@@ -429,7 +475,8 @@ class v8SegmentationLoss(v8DetectionLoss):
         imgsz: torch.Tensor,
         overlap: bool,
     ) -> torch.Tensor:
-        """Calculate the loss for instance segmentation.
+        """
+        Calculate the loss for instance segmentation.
 
         Args:
             fg_mask (torch.Tensor): A binary tensor of shape (BS, N_anchors) indicating which anchors are positive.
@@ -581,7 +628,8 @@ class v8PoseLoss(v8DetectionLoss):
         target_bboxes: torch.Tensor,
         pred_kpts: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Calculate the keypoints loss for the model.
+        """
+        Calculate the keypoints loss for the model.
 
         This function calculates the keypoints loss and keypoints object loss for a given batch. The keypoints loss is
         based on the difference between the predicted keypoints and ground truth keypoints. The keypoints object loss is
@@ -755,7 +803,8 @@ class v8OBBLoss(v8DetectionLoss):
     def bbox_decode(
         self, anchor_points: torch.Tensor, pred_dist: torch.Tensor, pred_angle: torch.Tensor
     ) -> torch.Tensor:
-        """Decode predicted object bounding box coordinates from anchor points and distribution.
+        """
+        Decode predicted object bounding box coordinates from anchor points and distribution.
 
         Args:
             anchor_points (torch.Tensor): Anchor points, (h*w, 2).
