@@ -1,6 +1,5 @@
-# Ultralytics YOLO11 - P2-only detection head (for small/far objects)
-# No Coordinate Attention, only P2 output
-nc: 80  # number of classes
+# Ultralytics YOLO11 - P2-only (Fixed Concat Resolution)
+nc: 80
 
 scales:
   n: [0.50, 0.25, 1024]
@@ -11,10 +10,10 @@ scales:
 
 backbone:
   - [-1, 1, Conv, [64, 3, 2]]              # 0-P1/2
-  - [-1, 1, Conv, [128, 3, 2]]             # 1-P2/4 (keep this!)
+  - [-1, 1, Conv, [128, 3, 2]]             # 1-P2/4 ← ✅ resolusi H/4
   - [-1, 2, C3k2, [256, False, 0.25]]      # 2
   - [-1, 1, Conv, [256, 3, 2]]             # 3-P3/8
-  - [-1, 2, C3k2, [512, False, 0.25]]      # 4
+  - [-1, 2, C3k2, [512, False, 0.25]]      # 4-P3 feature ← ✅ gunakan ini untuk upsample ke P2
   - [-1, 1, Conv, [512, 3, 2]]             # 5-P4/16
   - [-1, 2, C3k2, [512, True]]             # 6
   - [-1, 1, Conv, [1024, 3, 2]]            # 7-P5/32
@@ -23,14 +22,13 @@ backbone:
   - [-1, 2, C2PSA, [1024]]                 # 10
 
 head:
-  # 🔹 Only build path to P2
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 11 ← Upsample P3
-  - [[-1, 4], 1, Concat, [1]]                    # 12 ← cat P3
-  - [-1, 2, C3k2, [256, False]]                  # 13
+  # 🔸 Langsung upsample dari P3 (index 4) ke P2
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 11 ← dari P5? TIDAK! Ganti source
 
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 14 ← Upsample to P2
-  - [[-1, 1], 1, Concat, [1]]                    # 15 ← cat backbone P2 (index 1)
-  - [-1, 1, C3k2, [128, False]]                  # 16 ← P2 head
+  # ✅ Perbaiki: ambil P3 (index 4) sebagai dasar
+  - [4, 1, nn.Upsample, [None, 2, "nearest"]]    # 11 ← upsample P3 (H/8 → H/4)
+  - [[-1, 1], 1, Concat, [1]]                    # 12 ← concat dengan P2 (index 1) → H/4 + H/4 = ✅
+  - [-1, 1, C3k2, [128, False]]                  # 13 ← P2 head
 
-  # 🔹 Detection Head: ONLY P2
-  - [[16], 1, Detect, [nc]]            
+  # 🔹 Detection: hanya P2
+  - [[13], 1, Detect, [nc]]                      # 14
