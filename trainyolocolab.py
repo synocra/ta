@@ -26,7 +26,7 @@ model.train(
     batch=32,
     workers=8,
     device=0,
-    optimizer="AdamW",
+    optimizer="SGD",
     lr0=0.001,
     pretrained=False,
     project=RUNS_DIR,
