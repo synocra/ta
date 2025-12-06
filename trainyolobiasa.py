@@ -6,10 +6,11 @@ model = YOLO("yolo11n.pt")
 # ✅ Latih model dengan augmentasi "buah tampak kecil / jauh"
 model.train(
     data="dataset.yaml",
-    epochs=100,
-    imgsz=360,
-    batch=8,
+    epochs=120,
+    imgsz=480,
+    batch=32,
     device=0,
+    workers=8,
     optimizer="AdamW",
     lr0=0.001,
     pretrained=False,

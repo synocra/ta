@@ -21,10 +21,10 @@ model = YOLO(MODEL_CFG)
 # ✅ Latih model di GPU T4 dengan augmentasi “jarak jauh”
 model.train(
     data=DATA_PATH,
-    epochs=100,
-    imgsz=360,
-    batch=8,
-    workers=2,
+    epochs=120,
+    imgsz=480,
+    batch=32,
+    workers=8,
     device=0,
     optimizer="AdamW",
     lr0=0.001,
