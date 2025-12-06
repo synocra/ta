@@ -37,13 +37,13 @@ model.train(
     scale=0.40,          # mengecilkan objek (0.4–0.6 cocok)
     translate=0.2,       # geser posisi objek agar tidak selalu di tengah
     mosaic=1.0,          # aktifkan mosaic (4 gambar jadi satu)
-    perspective=0.0005,  # distorsi ringan agar seperti jarak optik
     shear=1.0,           # sedikit rotasi & kemiringan
     hsv_h=0.015,
     hsv_v=0.4,
     erasing=0.0,         # matikan random erasing agar objek kecil tidak hilang
     copy_paste=0.0,      # hindari salin-tempel berlebihan
-    perspective=0.001,      # distorsi ringan (0.0005–0.002)
+    perspective=0.0005,  # distorsi ringan agar seperti jarak optik
+
 )
 
 print("\n🎉 Training selesai! Model tersimpan di folder:")
